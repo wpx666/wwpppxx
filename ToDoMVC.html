@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+  <title>Document</title>
+  <link rel="stylesheet" href="./css/index.css">
+</head>
+
+<body>
+  <section class="todoapp">
+    <header class="header">
+      <h1>备忘录</h1>
+      <input autofocus="autofocus" v-model.trim="list" @keyup.enter="addList" autocomplete="off" placeholder="你想干啥!" class="new-todo" />
+    </header>
+    <section class="main">
+      <input type="checkbox" @change="CheckAll" v-model="allCheck" class="toggle-all" />
+      <ul class="todo-list">
+        <li class="todo"
+         :class="{completed:item.completed,editing:editTodo==item}"
+          v-for="(item, index) in currentList"
+          @dblclick="update(item)"
+            >
+          <div class="view">
+            <input type="checkbox" class="toggle" v-model="item.completed" />
+            <label>{{item.message}}</label> 
+            <button class="destroy" @click="delOne(index)"></button>
+          </div>
+          <input type="text" class="edit"
+          v-model="item.message"
+          @blur="editTodo=undefined"
+          @keyup.enter="editTodo=undefined"
+           />
+        </li>
+        <!-- <li class="todo completed">
+          <div class="view">
+            <input type="checkbox" class="toggle" /> <label>123</label>
+            <button class="destroy"></button>
+          </div>
+          <input type="text" class="edit" />
+        </li>
+        <li class="todo completed">
+          <div class="view">
+            <input type="checkbox" class="toggle" /> <label>12312</label>
+            <button class="destroy"></button>
+          </div>
+          <input type="text" class="edit" />
+        </li> -->
+      </ul>
+    </section>
+    <footer class="footer">
+      <span class="todo-count" v-show="active>0"><strong>{{active}}</strong> {{active>1?'items':'item'}} left </span>
+      <ul class="filters">
+        <li><a href="#/all" :class="{selected:status=='All'}" @click="status='All'">All</a></li>
+        <li><a href="#/active" :class="{selected:status=='Active'}" @click="status='Active'">Active</a></li>
+        <li><a href="#/completed" :class="{selected:status=='Completed'}" @click="status='Completed'">Completed</a></li>
+      </ul>
+      <button class="clear-completed" @click="delAll">Clear completed</button>
+    </footer>
+  </section>
+  <footer class="info">
+    <p>双击进入编辑状态</p>
+    <p>感谢 <a href="http://evanyou.me">Evan You</a></p>
+    <p>感谢 <a href="http://todomvc.com">TodoMVC</a></p>
+    <!-- github 新建一个仓库 仓库的名字 必须是 自己的用户名.github.io
+            上传一个 静态页面 首页index.html
+        -->
+    <p> <a href="https://autumnfish.github.io/">关于我</a></p>
+  </footer>
+  <script src="./lib/vue.js"></script>
+  <script>
+    /*
+    需求1
+      顶部输入框
+      输入内容 点击回车
+      获取输入的内容 添加到页面上
+      [
+        {
+          content:'干嘛', 新增的内容
+          completed:false 默认新增的是没有完成的
+        }
+      ]
+    需求2
+        输入内容 为空提示用户
+        新增完毕之后 清空内容
+    需求3
+        点击每一行的checkbox 切换完成状态
+        直接使用双向数据绑定给每一行的checkbox即可
+    需求4
+        点击每一行末尾的删除按钮 删除当前这一条数据即可
+    需求5
+        待办事项数据常驻 localStorage(只要不清除缓存 一直都在) sessionStroage(一次会话,关闭浏览器)
+          如果要保证 缓存数据一直都存在 保存在服务器的数据库 客户端是不可控
+        时机1:
+          读取数据
+            页面打开时读取数据
+          保存数据
+            每次修改数据 ->性能消耗大
+            关闭浏览器时保存 ->性能消耗小
+    需求6
+        点击顶部的全选 让底部的所有checkbox的选中状态 跟自己一样即可
+          顶部使用双向数据绑定 在点击事件中 获取他的选中状态即可
+    需求7
+        实现方式1:
+          点击底部的单选
+            根据选中的个数 以及总个数 决定顶部全选状态的值
+        实现方式2:
+          使用Vue的侦听器来观察 待办事项大数组 的改变
+          改变之后 触发选中状态判断即可
+    需求8
+        计算没有完成的事件的个数
+        使用计算属性完成
+    需求9
+        点击右下角的 clear completed
+        删除所有 completed ==true的值
+    需求10
+        1.点击底部中间的 筛选选装 切换 高亮的类名
+        2.切换顶部显示的内容
+          使用计算属性来实现就可以了
+          根据选中状态的不同 返回不一样的数组即可
+    需求11
+        双击某一项 进入编辑状态
+        为当前点击的li标签 增加 editing这个类名 (从官方实例中看到的类名)
+  */
+  
+  let app= new Vue({
+    el:".todoapp",
+    data:{
+      items:[],
+      list:"",
+      allCheck:false,
+      status:"All",
+      editTodo:undefined
+    },
+    methods:{
+      addList(){
+        if (this.list=="") {
+          return
+        };
+        this.items.unshift({
+          message:this.list,
+          completed:false
+        });
+        this.list=""
+      },
+      delOne(index){
+        this.items.splice(index,1)
+      },
+      CheckAll(){
+        this.items.forEach(v=>{
+          v.completed=this.allCheck;
+        })
+      },
+      delAll(){
+        this.items.forEach((v,index)=>{
+          if (v.completed) {
+            this.items.splice(index,1)
+          }
+        })
+      },
+      update(item){
+        this.editTodo=item;
+      }
+    },
+    watch:{
+      items: {
+      handler: function (val, oldVal) { 
+        let num=0;
+        this.items.forEach(v=>{
+          if (v.completed) {
+            num++
+          }
+        });
+        this.allCheck=this.items.length==num;
+       },
+      deep: true
+    },
+    },
+    computed:{
+       active(){
+         let num=0;
+         this.items.forEach(v=>{
+           if (!v.completed) {
+             num++
+           }
+         });
+         return num;
+       },
+       currentList(){
+        if (this.status=='All') {
+          return this.items;
+        }else if(this.status=='Active'){
+          let tem=[];
+          this.items.forEach(v=>{
+            if (!v.completed) {
+              tem.push(v)
+            }
+          });
+          return tem;
+        }else{
+          let tem=[];
+          this.items.forEach(v=>{
+            if (v.completed) {
+              tem.push(v)
+            }
+          });
+          return tem;
+        }
+    }
+    },
+    created() {
+      this.items=JSON.parse(localStorage.getItem("todo"))||[{completed:false,message:"还需要多久多长"}]
+    },
+  })
+  window.onbeforeunload=()=>{
+    localStorage.setItem('todo',JSON.stringify(app.items))
+  }
+  </script>
+</body>
+
+</html>
